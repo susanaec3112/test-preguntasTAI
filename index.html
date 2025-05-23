@@ -3,17 +3,59 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test TAI</title>
+  <title>Test TAI Funcional</title>
+  <style>
+    body { font-family: sans-serif; padding: 2rem; background: #f8f8f8; }
+    .pregunta { font-size: 1.2rem; margin-bottom: 1rem; }
+    .opcion { display: block; margin: 0.5rem 0; }
+    #botonSiguiente { margin-top: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Test TAI</h1>
+  <div id="contenedor">
+    <p>Cargando preguntas...</p>
+  </div>
+
   <script>
     const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv';
-    function iniciarTest() {
-      alert("📊 Test TAI cargado desde CSV y listo para empezar");
-      // Aquí iría el resto del script para iniciar test, cargar CSV, mostrar preguntas...
+    let preguntas = [];
+    let indice = 0;
+    let aciertos = 0;
+
+    fetch(CSV_URL)
+      .then(res => res.text())
+      .then(data => {
+        const lineas = data.trim().split('\n');
+        const encabezado = lineas.shift().split(',');
+        preguntas = lineas.map(linea => {
+          const [pregunta, a, b, c, correcta] = linea.split(',');
+          return { pregunta, a, b, c, correcta };
+        });
+        mostrarPregunta();
+      });
+
+    function mostrarPregunta() {
+      const contenedor = document.getElementById('contenedor');
+      if (indice >= preguntas.length) {
+        contenedor.innerHTML = '<h2>Test finalizado ✅</h2><p>Aciertos: ' + aciertos + '/' + preguntas.length + '</p>';
+        return;
+      }
+      const p = preguntas[indice];
+      contenedor.innerHTML = `
+        <div class="pregunta">${indice + 1}. ${p.pregunta}</div>
+        <button class="opcion" onclick="responder('A')">A. ${p.a}</button>
+        <button class="opcion" onclick="responder('B')">B. ${p.b}</button>
+        <button class="opcion" onclick="responder('C')">C. ${p.c}</button>
+      `;
+    }
+
+    function responder(letra) {
+      const correcta = preguntas[indice].correcta.trim();
+      if (letra === correcta) aciertos++;
+      indice++;
+      mostrarPregunta();
     }
   </script>
-</head>
-<body style="background:#f4f4f4;font-family:sans-serif;text-align:center;margin-top:3rem;">
-  <h1>Test TAI Configurable</h1>
-  <button onclick="iniciarTest()" style="padding:1rem 2rem;font-size:1.2rem;">Comenzar test</button>
 </body>
 </html>
