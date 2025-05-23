@@ -29,7 +29,7 @@
         <option value="practica">Modo práctica</option>
       </select>
     </label>
-    <label>Tema:
+    <label>Nº preguntas: <input type="number" id="numPreguntas" value="10" min="1" style="width:60px;" /> </label><label>Tema:
       <select id="filtro">
         <option value="">Todos</option>
       </select>
@@ -51,8 +51,10 @@ fetch(CSV_URL)
     const lineas = data.trim().split("\n");
     lineas.shift();
     todasPreguntas = lineas.map(l => {
-      const [pregunta, a, b, c, correcta, tema] = l.split(",");
-      return { pregunta, a, b, c, correcta, tema: tema.trim().toUpperCase() };
+      const partes = l.split(",");
+      const [pregunta, a, b, c, correcta] = partes;
+      const tema = partes.slice(5).join(",").trim().toUpperCase();
+      return { pregunta, a, b, c, correcta, tema };
     });
     cargarTemas();
   });
@@ -74,6 +76,8 @@ function iniciarTest() {
   temaFiltro = document.getElementById("filtro").value.toUpperCase();
   preguntas = todasPreguntas.filter(p => temaFiltro === "" || p.tema === temaFiltro);
   preguntas = preguntas.sort(() => Math.random() - 0.5);
+  const max = parseInt(document.getElementById('numPreguntas').value);
+  if (!isNaN(max) && max > 0) preguntas = preguntas.slice(0, max);
   usadas = [];
   aciertos = 0;
   fallos = 0;
