@@ -1,91 +1,299 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test tipo test - Susana</title>
+  <title>Test TAI Configurable</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #f9f9f9;
+      background-color: #f7f7f7;
       padding: 2rem;
       max-width: 800px;
       margin: auto;
     }
-    h1 {
+    h1, h2 {
       text-align: center;
-      color: #2c3e50;
     }
-    .question {
-      background-color: #ffffff;
+    .config-section, .question-card {
+      background: white;
       border-radius: 8px;
-      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
       padding: 1.5rem;
       margin-bottom: 2rem;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
-    .question p {
-      font-size: 1.1rem;
-      font-weight: bold;
+    label, select, input {
+      display: block;
+      margin: 0.5rem 0;
     }
     button {
-      margin-top: 0.5rem;
-      padding: 0.4rem 1rem;
-      border: none;
       background-color: #3498db;
       color: white;
+      border: none;
+      padding: 0.6rem 1.2rem;
+      font-size: 1rem;
       border-radius: 4px;
       cursor: pointer;
+      margin-top: 1rem;
     }
-    button:hover {
-      background-color: #2980b9;
-    }
-    .resultado {
-      margin-top: 0.5rem;
-      font-weight: bold;
-    }
+    .question-card { display: none; }
+    .question-card.active { display: block; }
+    .result { font-weight: bold; margin-top: 0.5rem; }
+    #final-summary { text-align: center; font-weight: bold; margin-top: 2rem; }
+    .dark { background-color: #1c1c1c; color: white; }
+    .dark .question-card { background-color: #333; }
+    .dark button { background-color: #555; }
   </style>
 </head>
 <body>
-  <h1>Test tipo test</h1>
-  <div id="quiz"></div>
+  <h1>Test TAI Configurable</h1>
 
-  <script>
+  <div class="config-section" id="config">
+    <h2>Configuración Inicial</h2>
+    <label>Duración del test:</label>
+    <select id="tiempo">
+      <option value="1800">30 minutos</option>
+      <option value="3600">60 minutos</option>
+      <option value="5400" selected>90 minutos</option>
+    </select>
+
+    <label>Modo de nota:</label>
+    <select id="penalizacion">
+      <option value="0">Sin penalización</option>
+      <option value="0.33" selected>Con penalización (-0.33 por fallo)</option>
+    </select>
+
+    <label>Modo visual:</label>
+    <select id="visual">
+      <option value="claro">Claro</option>
+      <option value="oscuro">Oscuro</option>
+    </select>
+
+    <label>Mostrar resumen final:</label>
+    <select id="resumen">
+      <option value="si" selected>Sí</option>
+      <option value="no">No</option>
+    </select>
+
+    <button onclick="iniciarTest()">Comenzar test</button>
+  </div>
+
+  <div id="cronometro" style="text-align:center; font-weight:bold;"></div>
+  <div id="quiz-container"></div>
+  <div id="final-summary"></div>
+
+  
+<script>
+    let historial = JSON.parse(localStorage.getItem('historialNotas') || "[]");
+    function guardarNota(nota, aciertos, fallos) {
+        const fecha = new Date().toLocaleString();
+        historial.push({ fecha, nota, aciertos, fallos });
+        localStorage.setItem('historialNotas', JSON.stringify(historial));
+    }
+
+    function mostrarHistorial() {
+        if (historial.length === 0) return "";
+        let html = "
+<h3>📈 Historial de Notas:</h3>
+<canvas id="graficoNotas" width="400" height="200" style="margin-bottom: 2rem;"></canvas>
+<button onclick="exportarCSV()">📤 Exportar CSV</button><ul>";
+        historial.forEach(h => {
+            html += `<li>${h.fecha} - Nota: ${h.nota} | ✅ ${h.aciertos} | ❌ ${h.fallos}</li>`;
+        });
+        html += "</ul>";
+        return html;
+    }
+
     const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv";
+    let preguntas = [], configuracion = {tiempo:5400, penalizacion:0.33, visual:"claro", resumen:"si"};
+    let filtradas = [], current = 0, aciertos = 0, fallos = 0, intervalo;
 
-    fetch(url)
-      .then(response => response.text())
-      .then(data => {
-        const lines = data.trim().split('\n');
-        const headers = lines[0].split(',');
-        const questions = lines.slice(1).map(line => {
-          const [pregunta, opcionA, opcionB, opcionC, correcta] = line.split(',');
-          return { pregunta, opcionA, opcionB, opcionC, correcta };
-        });
+    function iniciarTest() {
+      configuracion.tiempo = parseInt(document.getElementById("tiempo").value);
+      configuracion.penalizacion = parseFloat(document.getElementById("penalizacion").value);
+      configuracion.visual = document.getElementById("visual").value;
+      configuracion.resumen = document.getElementById("resumen").value;
 
-        const container = document.getElementById("quiz");
-        questions.forEach((q, i) => {
-          const div = document.createElement("div");
-          div.className = "question";
-          div.innerHTML = `
-            <p>${i + 1}. ${q.pregunta}</p>
-            <label><input type="radio" name="q${i}" value="A"> A) ${q.opcionA}</label><br>
-            <label><input type="radio" name="q${i}" value="B"> B) ${q.opcionB}</label><br>
-            <label><input type="radio" name="q${i}" value="C"> C) ${q.opcionC}</label><br>
-            <button onclick="verificar('q${i}', '${q.correcta}', this)">Comprobar</button>
-            <p class="resultado"></p>
-          `;
-          container.appendChild(div);
+      if (configuracion.visual === "oscuro") document.body.classList.add("dark");
+      document.getElementById("config").style.display = "none";
+
+      fetch(url).then(r => r.text()).then(data => {
+        const lines = data.trim().split("\n");
+        preguntas = lines.slice(1).map(line => {
+          const [pregunta, opcionA, opcionB, opcionC, correcta, tema, explicacion] = line.split(',');
+          return { pregunta, opcionA, opcionB, opcionC, correcta, tema, explicacion };
         });
+        filtradas = preguntas.sort(() => Math.random() - 0.5);
+        renderizarPreguntas();
+        mostrarPregunta(0);
+        iniciarCronometro(configuracion.tiempo);
       });
+    }
 
-    function verificar(nombre, correcta, boton) {
-      const seleccion = document.querySelector(`input[name="${nombre}"]:checked`);
-      const resultado = boton.nextElementSibling;
-      if (!seleccion) {
-        resultado.textContent = "❗ Selecciona una opción.";
+    function renderizarPreguntas() {
+      const cont = document.getElementById("quiz-container");
+      cont.innerHTML = "";
+      filtradas.forEach((q, i) => {
+        const div = document.createElement("div");
+        div.className = "question-card";
+        div.id = "q" + i;
+        div.innerHTML = `
+          <p>${i+1}. ${q.pregunta}</p>
+          <label><input type="radio" name="q${i}" value="A"> A) ${q.opcionA}</label>
+          <label><input type="radio" name="q${i}" value="B"> B) ${q.opcionB}</label>
+          <label><input type="radio" name="q${i}" value="C"> C) ${q.opcionC}</label>
+          <div class="result" id="result${i}"></div>
+          <button onclick="comprobar(${i}, '${q.correcta.trim()}')">Comprobar</button>
+        `;
+        cont.appendChild(div);
+      });
+    }
+
+    function mostrarPregunta(i) {
+      document.querySelectorAll(".question-card").forEach(card => card.classList.remove("active"));
+      const card = document.getElementById("q" + i);
+      if (card) card.classList.add("active");
+    }
+
+    function comprobar(i, correcta) {
+      const sel = document.querySelector(`input[name="q${i}"]:checked`);
+      const res = document.getElementById("result" + i);
+      if (!sel) {
+        res.textContent = "❗ Selecciona una opción.";
         return;
       }
-      resultado.textContent = seleccion.value === correcta.trim() ? "✅ ¡Correcto!" : "❌ Incorrecto";
+      if (sel.value === correcta) {
+        aciertos++;
+        res.textContent = "✅ Correcto";
+        res.style.color = "green";
+      } else {
+        fallos++;
+        res.textContent = "❌ Incorrecto";
+        res.style.color = "red";
+      }
+      document.querySelectorAll(`#q${i} input`).forEach(inp => inp.disabled = true);
+      setTimeout(() => {
+        current++;
+        if (current < filtradas.length) mostrarPregunta(current);
+        else finalizarTest();
+      }, 1000);
     }
-  </script>
+
+    function iniciarCronometro(segundos) {
+      const crono = document.getElementById("cronometro");
+      const update = () => {
+        let min = Math.floor(segundos / 60);
+        let sec = segundos % 60;
+        crono.textContent = `⏳ Tiempo restante: ${min}:${sec.toString().padStart(2, '0')}`;
+        if (segundos <= 0) {
+          clearInterval(intervalo);
+          finalizarTest();
+        }
+        segundos--;
+      };
+      update();
+      intervalo = setInterval(update, 1000);
+    }
+
+    function finalizarTest() {
+      clearInterval(intervalo);
+      document.getElementById("quiz-container").innerHTML = "";
+      const notaFinal = (aciertos - (fallos * configuracion.penalizacion)).toFixed(2);
+      let resumen = `✅ Aciertos: ${aciertos}<br>❌ Fallos: ${fallos}<br>📊 Nota final: ${notaFinal} / ${filtradas.length}`;
+      if (configuracion.resumen === "si") {
+        resumen += "<hr><h3>Resumen:</h3><ul>";
+        filtradas.forEach((p, i) => {
+          resumen += `<li><strong>${p.pregunta}</strong><br>✔️ Respuesta correcta: ${p.correcta}`;
+          if (p.explicacion) resumen += `<br>ℹ️ ${p.explicacion}`;
+          resumen += "</li>";
+        });
+        resumen += "</ul>";
+      }
+      guardarNota(notaFinal, aciertos, fallos);
+      document.getElementById("final-summary").innerHTML = resumen + mostrarHistorial();
+    }
+  
+    function exportarCSV() {
+        if (historial.length === 0) return alert("No hay datos para exportar.");
+        const filas = [["Fecha", "Nota", "Aciertos", "Fallos"], ...historial.map(h => [h.fecha, h.nota, h.aciertos, h.fallos])];
+        const csv = filas.map(f => f.join(",")).join("\n");
+        const blob = new Blob([csv], {{ type: 'text/csv' }});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "historial_test.csv";
+        a.click();
+        URL.revokeObjectURL(url);
+    }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+  function mostrarGrafico() {
+    const ctx = document.getElementById('graficoNotas');
+    if (!ctx || historial.length === 0) return;
+    const labels = historial.map(h => h.fecha);
+    const notas = historial.map(h => parseFloat(h.nota));
+    const aciertos = historial.map(h => h.aciertos);
+    const fallos = historial.map(h => h.fallos);
+    new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: labels,
+        datasets: [{
+          label: 'Nota',
+          data: notas,
+          borderColor: 'green',
+          backgroundColor: 'rgba(0, 128, 0, 0.1)',
+          yAxisID: 'y',
+        },{
+          label: 'Aciertos',
+          data: aciertos,
+          borderColor: 'blue',
+          backgroundColor: 'rgba(0, 0, 255, 0.1)',
+          yAxisID: 'y1',
+        },{
+          label: 'Fallos',
+          data: fallos,
+          borderColor: 'red',
+          backgroundColor: 'rgba(255, 0, 0, 0.1)',
+          yAxisID: 'y1',
+        }]
+      },
+      options: {
+        responsive: true,
+        interaction: {
+          mode: 'index',
+          intersect: false,
+        },
+        stacked: false,
+        plugins: {
+          title: {
+            display: true,
+            text: 'Evolución de resultados'
+          }
+        },
+        scales: {
+          y: {
+            type: 'linear',
+            display: true,
+            position: 'left',
+            beginAtZero: true,
+            title: { display: true, text: 'Nota' }
+          },
+          y1: {
+            type: 'linear',
+            display: true,
+            position: 'right',
+            beginAtZero: true,
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Aciertos / Fallos' }
+          }
+        }
+      }
+    });
+  }
+  mostrarGrafico();
+</script>
 </body>
 </html>
