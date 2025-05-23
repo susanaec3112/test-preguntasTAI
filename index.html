@@ -2,53 +2,55 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Test desde Google Sheets</title>
+  <title>Test tipo test - Susana</title>
   <style>
-    body { font-family: sans-serif; padding: 2rem; }
-    .question { margin-bottom: 2rem; }
-    button { padding: 0.5rem; margin-top: 1rem; }
+    body { font-family: sans-serif; max-width: 800px; margin: auto; padding: 2rem; }
+    .question { border-bottom: 1px solid #ccc; margin-bottom: 2rem; padding-bottom: 1rem; }
+    button { margin-top: 0.5rem; }
+    .resultado { font-weight: bold; margin-top: 0.5rem; }
   </style>
 </head>
 <body>
-  <h1>Test interactivo</h1>
+  <h1>Test tipo test desde Google Sheets</h1>
   <div id="quiz"></div>
 
   <script>
-    const sheetID = "2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss";
-    const sheetName = "Hoja 1"; // Asegúrate de que tu hoja tenga este nombre
-    const url = `https://docs.google.com/spreadsheets/d/${sheetID}/gviz/tq?tqx=out:json&sheet=${sheetName}`;
+    const url = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv";
 
     fetch(url)
-      .then(res => res.text())
+      .then(response => response.text())
       .then(data => {
-        const json = JSON.parse(data.substr(47).slice(0, -2));
-        const rows = json.table.rows;
-        const quizDiv = document.getElementById("quiz");
+        const lines = data.trim().split('\n');
+        const headers = lines[0].split(',');
+        const questions = lines.slice(1).map(line => {
+          const [pregunta, opcionA, opcionB, opcionC, correcta] = line.split(',');
+          return { pregunta, opcionA, opcionB, opcionC, correcta };
+        });
 
-        rows.forEach((row, index) => {
-          const [pregunta, a, b, c, correcta] = row.c.map(c => c?.v || "");
+        const container = document.getElementById("quiz");
+        questions.forEach((q, i) => {
           const div = document.createElement("div");
           div.className = "question";
           div.innerHTML = `
-            <p><strong>${index + 1}. ${pregunta}</strong></p>
-            <label><input type="radio" name="q${index}" value="A"> A) ${a}</label><br>
-            <label><input type="radio" name="q${index}" value="B"> B) ${b}</label><br>
-            <label><input type="radio" name="q${index}" value="C"> C) ${c}</label><br>
-            <button onclick="verificar('${correcta}', 'q${index}', this)">Comprobar</button>
+            <p><strong>${i + 1}. ${q.pregunta}</strong></p>
+            <label><input type="radio" name="q${i}" value="A"> A) ${q.opcionA}</label><br>
+            <label><input type="radio" name="q${i}" value="B"> B) ${q.opcionB}</label><br>
+            <label><input type="radio" name="q${i}" value="C"> C) ${q.opcionC}</label><br>
+            <button onclick="verificar('q${i}', '${q.correcta}', this)">Comprobar</button>
             <p class="resultado"></p>
           `;
-          quizDiv.appendChild(div);
+          container.appendChild(div);
         });
       });
 
-    function verificar(respuesta, name, btn) {
-      const seleccion = document.querySelector(`input[name="${name}"]:checked`);
-      const resultado = btn.nextElementSibling;
-      if (!seleccion) {
-        resultado.textContent = "❗ Selecciona una opción";
+    function verificar(nombre, correcta, boton) {
+      const seleccionado = document.querySelector(`input[name="${nombre}"]:checked`);
+      const resultado = boton.nextElementSibling;
+      if (!seleccionado) {
+        resultado.textContent = "❗ Selecciona una opción.";
         return;
       }
-      resultado.textContent = seleccion.value === respuesta ? "✅ Correcto" : "❌ Incorrecto";
+      resultado.textContent = seleccionado.value === correcta.trim() ? "✅ ¡Correcto!" : "❌ Incorrecto";
     }
   </script>
 </body>
