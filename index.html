@@ -9,8 +9,8 @@
     body { font-family: Arial, sans-serif; padding: 2rem; background: #f4f4f4; }
     .pregunta { font-size: 1.2rem; margin-bottom: 1rem; }
     .opcion { display: block; margin: 0.5rem 0; padding: 0.5rem; background: #fff; border: 1px solid #ccc; cursor: pointer; }
-    .config { margin-bottom: 2rem; }
-    .resultados { margin-top: 2rem; }
+    .config, .resultados { margin-bottom: 2rem; }
+    select, input, button { margin-left: 0.5rem; }
   </style>
 </head>
 <body>
@@ -29,8 +29,10 @@
         <option value="practica">Modo práctica</option>
       </select>
     </label>
-    <label>Filtrar por tema:
-      <input type="text" id="filtro" placeholder="Ej: M2T5" />
+    <label>Tema:
+      <select id="filtro">
+        <option value="">Todos</option>
+      </select>
     </label>
     <button onclick="iniciarTest()">Comenzar test</button>
   </div>
@@ -40,30 +42,44 @@
 <script>
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv';
 
-let preguntas = [], usadas = [], indice = 0, aciertos = 0, fallos = 0, timer;
+let todasPreguntas = [], preguntas = [], usadas = [], indice = 0, aciertos = 0, fallos = 0, timer;
 let modo = "penalizacion", tiempo = 60 * 60, temaFiltro = "";
+
+fetch(CSV_URL)
+  .then(res => res.text())
+  .then(data => {
+    const lineas = data.trim().split("\n");
+    lineas.shift();
+    todasPreguntas = lineas.map(l => {
+      const [pregunta, a, b, c, correcta, tema] = l.split(",");
+      return { pregunta, a, b, c, correcta, tema: tema.trim().toUpperCase() };
+    });
+    cargarTemas();
+  });
+
+function cargarTemas() {
+  const select = document.getElementById("filtro");
+  const temas = [...new Set(todasPreguntas.map(p => p.tema))].sort();
+  temas.forEach(t => {
+    const opt = document.createElement("option");
+    opt.value = t;
+    opt.textContent = t;
+    select.appendChild(opt);
+  });
+}
 
 function iniciarTest() {
   modo = document.getElementById("modo").value;
   tiempo = parseInt(document.getElementById("tiempo").value) * 60;
   temaFiltro = document.getElementById("filtro").value.toUpperCase();
-  fetch(CSV_URL)
-    .then(res => res.text())
-    .then(data => {
-      const lineas = data.trim().split("\n");
-      lineas.shift();
-      preguntas = lineas.map(l => {
-        const [pregunta, a, b, c, correcta, tema] = l.split(",");
-        return { pregunta, a, b, c, correcta, tema };
-      }).filter(p => temaFiltro === "" || p.tema.trim().toUpperCase() === temaFiltro);
-      preguntas = preguntas.sort(() => Math.random() - 0.5);
-      usadas = [];
-      aciertos = 0;
-      fallos = 0;
-      document.getElementById("config").style.display = "none";
-      iniciarTemporizador();
-      mostrarPregunta();
-    });
+  preguntas = todasPreguntas.filter(p => temaFiltro === "" || p.tema === temaFiltro);
+  preguntas = preguntas.sort(() => Math.random() - 0.5);
+  usadas = [];
+  aciertos = 0;
+  fallos = 0;
+  document.getElementById("config").style.display = "none";
+  iniciarTemporizador();
+  mostrarPregunta();
 }
 
 function iniciarTemporizador() {
@@ -112,8 +128,9 @@ function finalizarTest() {
     <h2>Test finalizado ✅</h2>
     <p>✔️ Aciertos: ${aciertos}</p>
     <p>❌ Fallos: ${fallos}</p>
-    <p>📝 Preguntas respondidas: ${total}</p>
+    <p>📄 Preguntas respondidas: ${total}</p>
     <p>📊 Nota: ${nota}</p>
+    <button onclick="location.reload()">🔁 Reiniciar test</button>
   `;
 }
 </script>
