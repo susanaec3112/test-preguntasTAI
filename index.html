@@ -2,60 +2,120 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="UTF-8">
-  <title>Test TAI Funcional</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Test TAI Configurable</title>
   <style>
-    body { font-family: sans-serif; padding: 2rem; background: #f8f8f8; }
+    body { font-family: Arial, sans-serif; padding: 2rem; background: #f4f4f4; }
     .pregunta { font-size: 1.2rem; margin-bottom: 1rem; }
-    .opcion { display: block; margin: 0.5rem 0; }
-    #botonSiguiente { margin-top: 1rem; }
+    .opcion { display: block; margin: 0.5rem 0; padding: 0.5rem; background: #fff; border: 1px solid #ccc; cursor: pointer; }
+    .config { margin-bottom: 2rem; }
+    .resultados { margin-top: 2rem; }
   </style>
 </head>
 <body>
-  <h1>Test TAI</h1>
-  <div id="contenedor">
-    <p>Cargando preguntas...</p>
+  <h1>Test TAI Configurable</h1>
+  <div class="config" id="config">
+    <label>Duración (min): 
+      <select id="tiempo">
+        <option value="30">30</option>
+        <option value="60" selected>60</option>
+        <option value="90">90</option>
+      </select>
+    </label>
+    <label>Modo: 
+      <select id="modo">
+        <option value="penalizacion">Penalización -0.33</option>
+        <option value="practica">Modo práctica</option>
+      </select>
+    </label>
+    <label>Filtrar por tema:
+      <input type="text" id="filtro" placeholder="Ej: M2T5" />
+    </label>
+    <button onclick="iniciarTest()">Comenzar test</button>
   </div>
+  <div id="testContainer"></div>
+  <div class="resultados" id="resultados"></div>
 
-  <script>
-    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv';
-    let preguntas = [];
-    let indice = 0;
-    let aciertos = 0;
+<script>
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv';
 
-    fetch(CSV_URL)
-      .then(res => res.text())
-      .then(data => {
-        const lineas = data.trim().split('\n');
-        const encabezado = lineas.shift().split(',');
-        preguntas = lineas.map(linea => {
-          const [pregunta, a, b, c, correcta] = linea.split(',');
-          return { pregunta, a, b, c, correcta };
-        });
-        mostrarPregunta();
-      });
+let preguntas = [], usadas = [], indice = 0, aciertos = 0, fallos = 0, timer;
+let modo = "penalizacion", tiempo = 60 * 60, temaFiltro = "";
 
-    function mostrarPregunta() {
-      const contenedor = document.getElementById('contenedor');
-      if (indice >= preguntas.length) {
-        contenedor.innerHTML = '<h2>Test finalizado ✅</h2><p>Aciertos: ' + aciertos + '/' + preguntas.length + '</p>';
-        return;
-      }
-      const p = preguntas[indice];
-      contenedor.innerHTML = `
-        <div class="pregunta">${indice + 1}. ${p.pregunta}</div>
-        <button class="opcion" onclick="responder('A')">A. ${p.a}</button>
-        <button class="opcion" onclick="responder('B')">B. ${p.b}</button>
-        <button class="opcion" onclick="responder('C')">C. ${p.c}</button>
-      `;
-    }
-
-    function responder(letra) {
-      const correcta = preguntas[indice].correcta.trim();
-      if (letra === correcta) aciertos++;
-      indice++;
+function iniciarTest() {
+  modo = document.getElementById("modo").value;
+  tiempo = parseInt(document.getElementById("tiempo").value) * 60;
+  temaFiltro = document.getElementById("filtro").value.toUpperCase();
+  fetch(CSV_URL)
+    .then(res => res.text())
+    .then(data => {
+      const lineas = data.trim().split("\n");
+      lineas.shift();
+      preguntas = lineas.map(l => {
+        const [pregunta, a, b, c, correcta, tema] = l.split(",");
+        return { pregunta, a, b, c, correcta, tema };
+      }).filter(p => temaFiltro === "" || p.tema.trim().toUpperCase() === temaFiltro);
+      preguntas = preguntas.sort(() => Math.random() - 0.5);
+      usadas = [];
+      aciertos = 0;
+      fallos = 0;
+      document.getElementById("config").style.display = "none";
+      iniciarTemporizador();
       mostrarPregunta();
+    });
+}
+
+function iniciarTemporizador() {
+  const intervalo = setInterval(() => {
+    tiempo--;
+    if (tiempo <= 0) {
+      clearInterval(intervalo);
+      finalizarTest();
     }
-  </script>
+  }, 1000);
+}
+
+function mostrarPregunta() {
+  if (usadas.length >= preguntas.length) return finalizarTest();
+  const p = preguntas[usadas.length];
+  const cont = document.getElementById("testContainer");
+  cont.innerHTML = `
+    <div class="pregunta">${usadas.length + 1}. ${p.pregunta}</div>
+    <button class="opcion" onclick="responder('A')">A. ${p.a}</button>
+    <button class="opcion" onclick="responder('B')">B. ${p.b}</button>
+    <button class="opcion" onclick="responder('C')">C. ${p.c}</button>
+    <button onclick="saltarla()">Saltar ❓</button>
+  `;
+}
+
+function responder(r) {
+  const actual = preguntas[usadas.length];
+  if (r === actual.correcta.trim()) aciertos++;
+  else if (modo === "penalizacion") fallos++;
+  usadas.push(actual);
+  mostrarPregunta();
+}
+
+function saltarla() {
+  usadas.push({ saltada: true });
+  mostrarPregunta();
+}
+
+function finalizarTest() {
+  const total = usadas.length;
+  const cont = document.getElementById("testContainer");
+  let nota = aciertos;
+  if (modo === "penalizacion") nota = (aciertos - (fallos * 0.33)).toFixed(2);
+  cont.innerHTML = "";
+  document.getElementById("resultados").innerHTML = `
+    <h2>Test finalizado ✅</h2>
+    <p>✔️ Aciertos: ${aciertos}</p>
+    <p>❌ Fallos: ${fallos}</p>
+    <p>📝 Preguntas respondidas: ${total}</p>
+    <p>📊 Nota: ${nota}</p>
+  `;
+}
+</script>
 </body>
 </html>
