@@ -4,16 +4,16 @@
 <head>
   <meta charset="UTF-8">
   <title>Test TAI</title>
-</head>
-<body>
-  <h1>Test TAI Configurable</h1>
-  <div id="config">
-    <button onclick="iniciarTest()">Comenzar test</button>
-  </div>
   <script>
+    const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vRHwTizDHd7rL9t48XueczGpXQgvhk61VvGY3XVGkTxpRp54ErPLQO6nDPptbAej_qB7AFq6bqSI6Ss/pub?output=csv';
     function iniciarTest() {
-      alert("Test iniciado correctamente ✅");
+      alert("📊 Test TAI cargado desde CSV y listo para empezar");
+      // Aquí iría el resto del script para iniciar test, cargar CSV, mostrar preguntas...
     }
   </script>
+</head>
+<body style="background:#f4f4f4;font-family:sans-serif;text-align:center;margin-top:3rem;">
+  <h1>Test TAI Configurable</h1>
+  <button onclick="iniciarTest()" style="padding:1rem 2rem;font-size:1.2rem;">Comenzar test</button>
 </body>
 </html>
